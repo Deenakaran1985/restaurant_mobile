@@ -49,22 +49,9 @@ jobs:
           if [ -f "android/build.gradle" ]; then
             sed -i "s/ext.kotlin_version = '[0-9]\+\.[0-9]\+\.[0-9]\+'/ext.kotlin_version = '1.9.24'/g" android/build.gradle || true
             sed -i 's/ext.kotlin_version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/ext.kotlin_version = "1.9.24"/g' android/build.gradle || true
+            echo "" >> android/build.gradle
+            echo "subprojects { afterEvaluate { project -> if (project.name == 'jni' || project.name == 'path_provider_android' || project.name == 'shared_preferences_android') { try { project.apply plugin: 'kotlin-android' } catch (Exception e) {} } } }" >> android/build.gradle
           fi
-          cat << 'EOF' >> android/build.gradle
-
-subprojects {
-    afterEvaluate { project ->
-        if (project.plugins.hasPlugin("com.android.library") || project.plugins.hasPlugin("com.android.application")) {
-            if (!project.plugins.hasPlugin("kotlin-android")) {
-                try { project.apply plugin: "kotlin-android" } catch (Exception e) {}
-            }
-        }
-        if (project.name == 'jni' || project.name == 'path_provider_android' || project.name == 'shared_preferences_android') {
-            try { project.apply plugin: "kotlin-android" } catch (Exception e) {}
-        }
-    }
-}
-EOF
 
       - name: 📦 Install Flutter Dependencies & Patch jni Toolchain
         run: |
