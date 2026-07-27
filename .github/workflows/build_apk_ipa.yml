@@ -1,4 +1,4 @@
-name: 📱 Antigravity Restaurant Mobile - Universal APK & IPA Build CI/CD
+name: 📱 Flutter Pure APK & IPA Release CI
 
 on:
   push:
@@ -8,21 +8,16 @@ on:
   workflow_dispatch:
     inputs:
       build_version:
-        description: 'Custom Build Version Name (e.g., v2.4.0-Enterprise)'
+        description: 'Release Build Version (e.g., v1.0.0-Universal)'
         required: true
         default: 'v1.0.0-Gold'
-      debug_build:
-        description: 'Build Debug binaries instead of Release'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build_android_apk:
-    name: 🤖 Build Android APK & App Bundle
+    name: 🤖 Build Android Release APK
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 Checkout Git Repository
         uses: actions/checkout@v4
 
       - name: ☕ Setup Java JDK 17
@@ -31,118 +26,69 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 💙 Setup Flutter Environment
+      - name: 💙 Setup Flutter Stable Environment
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
-          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
-      - name: ⚙️ Auto-Generate Native Android Project Scaffold & Configure Kotlin Classpath
+      - name: ⚙️ Auto-Generate Native Android Project Scaffold
         run: |
           flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
-          echo "Configuring Kotlin Gradle Plugin to 2.2.20 in root buildscript and settings..."
-          if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '2.2.20'/g" android/build.gradle || true
-            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/build.gradle || true
-            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/build.gradle || true
-            if ! grep -q "kotlin-gradle-plugin" android/build.gradle; then
-              sed -i '/dependencies {/a \        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20"' android/build.gradle || true
-            fi
-          fi
+          echo "Configuring Kotlin 2.2.20 & stable AGP 8.7.2 toolchains for release compilation..."
           if [ -f "android/build.gradle.kts" ]; then
             if ! grep -q "kotlin-gradle-plugin" android/build.gradle.kts; then
               printf '\nbuildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20")\n    }\n}\n' >> android/build.gradle.kts
             fi
           fi
-          if [ -f "android/settings.gradle" ]; then
-            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle || true
-            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle || true
-            sed -i "s/com.android.application' version '[^']*'/com.android.application' version '8.7.2'/g" android/settings.gradle || true
-            sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.7.2"/g' android/settings.gradle || true
-          fi
-          if [ -f "android/settings.gradle.kts" ]; then
-            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle.kts || true
-            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle.kts || true
-            sed -i "s/com.android.application' version '[^']*'/com.android.application' version '8.7.2'/g" android/settings.gradle.kts || true
-            sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.7.2"/g' android/settings.gradle.kts || true
-            sed -i "s/com.android.library' version '[^']*'/com.android.library' version '8.7.2'/g" android/settings.gradle.kts || true
-            sed -i 's/com.android.library" version "[^"]*"/com.android.library" version "8.7.2"/g' android/settings.gradle.kts || true
-          fi
+          find android -type f \( -name "*.gradle*" -o -name "*.properties" \) -exec sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g; /kotlin/s/version \"[^\"]*\"/version \"2.2.20\"/g; s/com.android.application' version '[^']*'/com.android.application' version '8.7.2'/g; s/com.android.application\" version \"[^\"]*\"/com.android.application\" version \"8.7.2\"/g; s/com.android.library' version '[^']*'/com.android.library' version '8.7.2'/g; s/com.android.library\" version \"[^\"]*\"/com.android.library\" version \"8.7.2\"/g" {} + || true
           mkdir -p ~/.gradle
           echo "android.newDsl=false" >> ~/.gradle/gradle.properties
           echo "android.newDsl=false" >> android/gradle.properties || true
-          echo "android.defaults.buildfeatures.buildconfig=true" >> android/gradle.properties || true
           echo "org.gradle.jvmargs=-Xmx4G -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties || true
 
-      - name: 📦 Install Flutter Dependencies & Sanitize jni Module
+      - name: 📦 Install Flutter Dependencies & Resolve Transitive AGP Namespaces
         run: |
           flutter pub get
-          echo "Applying clean unconditional namespace and removing legacy Kotlin toolchains from jni module..."
           python3 -c 'import glob, os, re; [open(p, "w").write(re.sub(r"if\s*\([^)]*namespace[^)]*\)\s*\{\s*namespace\s*[\x27\x22]([^\x27\x22]+)[\x27\x22]\s*\}", r"namespace \x27\1\x27", re.sub(r"kotlin\s*\{\s*[^{}]*jvmToolchain[^{}]*\}", "", open(p).read()))) for p in glob.glob(os.path.expanduser("~/.pub-cache/**/jni-*/android/build.gradle"), recursive=True)]' || true
 
-      - name: 🧪 Verify Code Formatting & Lint
-        run: |
-          flutter analyze || echo "Lint warnings ignored for automated release build"
-
-      - name: 🏗️ Build Master FAT Android APK (All Architectures)
+      - name: 🏗️ Build Master Universal Android APK
         run: flutter build apk --release --android-skip-build-dependency-validation
 
-      - name: 🏗️ Build Optimized Split APKs (arm64-v8a, armeabi-v7a, x86_64)
-        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
-
-      - name: 🏗️ Build Google Play Store App Bundle (.AAB)
-        run: flutter build appbundle --release --android-skip-build-dependency-validation
-
-      - name: 📤 Upload Universal APK Artifact
+      - name: 📤 Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: restaurant-mobile-apk-universal
+          name: restaurant-mobile-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-      - name: 📤 Upload Split APK Artifacts (Lightweight Waiter Handhelds)
-        uses: actions/upload-artifact@v4
-        with:
-          name: restaurant-mobile-apk-splits
-          path: build/app/outputs/flutter-apk/app-*-release.apk
-          retention-days: 30
-
-      - name: 📤 Upload Google Play App Bundle (AAB)
-        uses: actions/upload-artifact@v4
-        with:
-          name: restaurant-mobile-appbundle
-          path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
-
   build_ios_ipa:
-    name: 🍎 Build Apple iOS IPA Application
+    name: 🍎 Build Apple iOS Release IPA
     runs-on: macos-latest
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 Checkout Git Repository
         uses: actions/checkout@v4
 
-      - name: 💙 Setup Flutter Environment
+      - name: 💙 Setup Flutter Stable Environment
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: 🛠️ Setup Xcode & Apple Command Line Tools
+      - name: 🛠️ Setup Apple Command Line Tools
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
       - name: ⚙️ Auto-Generate Native iOS Project Scaffold & CocoaPods Harness
-        run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant .
+        run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
 
       - name: 📦 Install Flutter Dependencies
         run: flutter pub get
 
-      - name: 🍏 Install iOS CocoaPods Dependencies & Prepare Manual Signing
+      - name: 🍏 Prepare Manual Signing & CocoaPods Dependencies
         run: |
           if [ -d "ios/Runner.xcodeproj" ]; then
-            echo "Switching CODE_SIGN_STYLE from Automatic to Manual for unsigned CI builds..."
             sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj || true
             sed -i '' 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj || true
             sed -i '' 's/DEVELOPMENT_TEAM = [A-Z0-9]*;//g' ios/Runner.xcodeproj/project.pbxproj || true
@@ -151,17 +97,16 @@ jobs:
             cd ios && pod install --repo-update || echo "CocoaPods initialized automatically during flutter build"
           fi
 
-      - name: 🏗️ Build Unsigned Release iOS Application (.app)
+      - name: 🏗️ Compile Unsigned Native iOS Release Bundle (.app)
         run: |
-          echo "Preparing Flutter iOS configuration and Podfile dependencies..."
+          echo "Preparing Flutter iOS assets and configuration..."
           flutter build ios --release --config-only || flutter build ios --release --no-codesign || true
-          echo "Cleaning stale Xcode artifacts and intermediate builds to eliminate outside root path conflicts..."
           rm -rf build/ios/Release-iphoneos/*
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           cd ios
-          echo "Compiling native ARM64 release bundle without Apple Developer account credentials..."
+          echo "Compiling native ARM64 physical device bundle via Xcode..."
           xcodebuild clean build -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" -quiet || {
-            echo "Retrying compile with Ad-Hoc signing fallback..."
+            echo "Retrying compilation with Ad-Hoc code signing override..."
             xcodebuild build -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE="Manual" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED="YES" CODE_SIGNING_ALLOWED="YES" AD_HOC_CODE_SIGNING_ALLOWED="YES" -quiet
           }
 
@@ -175,38 +120,14 @@ jobs:
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -name "Runner.app" 2>/dev/null | head -n 1)
           fi
-          echo "Locally compiled Runner.app found at: $APP_PATH"
+          echo "Compiled Runner.app located at: $APP_PATH"
           cp -r "$APP_PATH" Payload/
           zip -r restaurant-mobile-ios.ipa Payload
-          ls -la restaurant-mobile-ios.ipa
+          ls -lh restaurant-mobile-ios.ipa
 
-      - name: 📤 Upload Apple iOS IPA Artifact (TestFlight & Sideloading)
+      - name: 📤 Upload Release iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: restaurant-mobile-ios-ipa
+          name: restaurant-mobile-release-ipa
           path: restaurant-mobile-ios.ipa
           retention-days: 30
-
-  release_bundle:
-    name: 🚀 Publish Automated Release Catalog
-    needs: [ build_android_apk, build_ios_ipa ]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Download Android APK Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: restaurant-mobile-apk-universal
-          path: release/android/
-
-      - name: 📥 Download Apple iOS IPA Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: restaurant-mobile-ios-ipa
-          path: release/ios/
-
-      - name: 📋 Display Compiled Release Binaries
-        run: |
-          ls -lh release/android/
-          ls -lh release/ios/
-          echo "🎉 Automated enterprise binary compiles ready for distribution across Waiter POS devices and Manager iPads!"
