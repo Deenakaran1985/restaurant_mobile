@@ -25,6 +25,10 @@ def main():
                     content = re.sub(r'(org\.jetbrains\.kotlin:kotlin-gradle-plugin:)[0-9\.]+', r'\g<1>2.0.20', content)
                     content = re.sub(r'ext\.kotlin_version\s*=\s*[\"\'][^\"\']+[\"\']', "ext.kotlin_version = '2.0.20'", content)
                     
+                    # Remove deprecated global buildconfig flag if present in properties
+                    if f.endswith(".properties"):
+                        content = re.sub(r'android\.defaults\.buildfeatures\.buildconfig=.*\n?', '', content)
+
                     # Pin Gradle wrapper to 8.9-all
                     if f == "gradle-wrapper.properties":
                         content = re.sub(r'gradle-[0-9\.]+-(all|bin)\.zip', 'gradle-8.9-all.zip', content)
@@ -72,7 +76,28 @@ buildscript {
                 file.write("\n".join(new_lines) + "\n")
             print("✅ Injected Kotlin buildscript classpath into android/build.gradle")
 
-    # 3. Apply global and local properties for AGP opt-outs and memory
+    # 3. Inject module-level buildFeatures { buildConfig = true } into android/app build script
+    app_kts = "android/app/build.gradle.kts"
+    app_groovy = "android/app/build.gradle"
+    
+    if os.path.exists(app_kts):
+        with open(app_kts, "r", encoding="utf-8") as file:
+            content = file.read()
+        if "buildFeatures" not in content:
+            content = re.sub(r'(android\s*\{)', r'\1\n    buildFeatures {\n        buildConfig = true\n    }\n', content, count=1)
+            with open(app_kts, "w", encoding="utf-8") as file:
+                file.write(content)
+            print("✅ Added module-level buildFeatures { buildConfig = true } to android/app/build.gradle.kts")
+    elif os.path.exists(app_groovy):
+        with open(app_groovy, "r", encoding="utf-8") as file:
+            content = file.read()
+        if "buildFeatures" not in content:
+            content = re.sub(r'(android\s*\{)', r'\1\n    buildFeatures {\n        buildConfig true\n    }\n', content, count=1)
+            with open(app_groovy, "w", encoding="utf-8") as file:
+                file.write(content)
+            print("✅ Added module-level buildFeatures { buildConfig true } to android/app/build.gradle")
+
+    # 4. Apply global and local properties without deprecated buildconfig flag
     gradle_dir = os.path.expanduser("~/.gradle")
     os.makedirs(gradle_dir, exist_ok=True)
     global_props = os.path.join(gradle_dir, "gradle.properties")
@@ -81,11 +106,17 @@ buildscript {
     with open(global_props, "a", encoding="utf-8") as file:
         file.write("\nandroid.newDsl=false\n")
         
+    if os.path.exists(local_props):
+        with open(local_props, "r", encoding="utf-8") as file:
+            c = file.read()
+        c = re.sub(r'android\.defaults\.buildfeatures\.buildconfig=.*\n?', '', c)
+        with open(local_props, "w", encoding="utf-8") as file:
+            file.write(c)
+            
     with open(local_props, "a", encoding="utf-8") as file:
         file.write("\nandroid.newDsl=false\n")
-        file.write("android.defaults.buildfeatures.buildconfig=true\n")
         file.write("org.gradle.jvmargs=-Xmx4G -XX:+HeapDumpOnOutOfMemoryError\n")
-    print("✅ Configured AGP fallback properties in global and local gradle.properties")
+    print("✅ Configured AGP fallback properties in global and local gradle.properties (without deprecated global buildconfig)")
 
 if __name__ == "__main__":
     main()
