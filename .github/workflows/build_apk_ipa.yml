@@ -58,12 +58,21 @@ jobs:
           if [ -f "android/settings.gradle" ]; then
             sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle || true
             sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle || true
+            sed -i "s/com.android.application' version '[^']*'/com.android.application' version '8.7.2'/g" android/settings.gradle || true
+            sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.7.2"/g' android/settings.gradle || true
           fi
           if [ -f "android/settings.gradle.kts" ]; then
             sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle.kts || true
             sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle.kts || true
+            sed -i "s/com.android.application' version '[^']*'/com.android.application' version '8.7.2'/g" android/settings.gradle.kts || true
+            sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.7.2"/g' android/settings.gradle.kts || true
+            sed -i "s/com.android.library' version '[^']*'/com.android.library' version '8.7.2'/g" android/settings.gradle.kts || true
+            sed -i 's/com.android.library" version "[^"]*"/com.android.library" version "8.7.2"/g' android/settings.gradle.kts || true
           fi
+          mkdir -p ~/.gradle
+          echo "android.newDsl=false" >> ~/.gradle/gradle.properties
           echo "android.newDsl=false" >> android/gradle.properties || true
+          echo "android.defaults.buildfeatures.buildconfig=true" >> android/gradle.properties || true
           echo "org.gradle.jvmargs=-Xmx4G -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties || true
 
       - name: 📦 Install Flutter Dependencies & Sanitize jni Module
