@@ -52,18 +52,7 @@ jobs:
           fi
           if [ -f "android/build.gradle.kts" ]; then
             if ! grep -q "kotlin-gradle-plugin" android/build.gradle.kts; then
-              cat << 'EOF' >> android/build.gradle.kts
-
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
-    }
-}
-EOF
+              printf '\nbuildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")\n    }\n}\n' >> android/build.gradle.kts
             fi
           fi
           if [ -f "android/settings.gradle" ]; then
