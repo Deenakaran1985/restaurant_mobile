@@ -38,11 +38,39 @@ jobs:
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
-      - name: ⚙️ Auto-Generate Native Android Project Scaffold
-        run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant .
+      - name: ⚙️ Auto-Generate Native Android Project Scaffold & Upgrade Kotlin Toolchain
+        run: |
+          flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
+          echo "Upgrading Kotlin plugin versions to 1.9.24 across Android build settings..."
+          if [ -f "android/settings.gradle" ]; then
+            sed -i 's/version "[0-9]\+\.[0-9]\+\.[0-9]\+"/version "1.9.24"/g' android/settings.gradle || true
+            sed -i "s/version '[0-9]\+\.[0-9]\+\.[0-9]\+'/version '1.9.24'/g" android/settings.gradle || true
+          fi
+          if [ -f "android/build.gradle" ]; then
+            sed -i "s/ext.kotlin_version = '[0-9]\+\.[0-9]\+\.[0-9]\+'/ext.kotlin_version = '1.9.24'/g" android/build.gradle || true
+            sed -i 's/ext.kotlin_version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/ext.kotlin_version = "1.9.24"/g' android/build.gradle || true
+          fi
+          cat << 'EOF' >> android/build.gradle
 
-      - name: 📦 Install Flutter Dependencies
-        run: flutter pub get
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin("com.android.library") || project.plugins.hasPlugin("com.android.application")) {
+            if (!project.plugins.hasPlugin("kotlin-android")) {
+                try { project.apply plugin: "kotlin-android" } catch (Exception e) {}
+            }
+        }
+        if (project.name == 'jni' || project.name == 'path_provider_android' || project.name == 'shared_preferences_android') {
+            try { project.apply plugin: "kotlin-android" } catch (Exception e) {}
+        }
+    }
+}
+EOF
+
+      - name: 📦 Install Flutter Dependencies & Patch jni Toolchain
+        run: |
+          flutter pub get
+          echo "Patching jni-1.0.1 kotlin jvmToolchain in pub-cache to resolve Gradle method errors..."
+          find ~/.pub-cache/ -path "*/jni-*/android/build.gradle" -exec sed -i '/jvmToolchain/d; /kotlin {/,/}/d' {} + || echo "No jni module modification needed."
 
       - name: 🧪 Verify Code Formatting & Lint
         run: |
