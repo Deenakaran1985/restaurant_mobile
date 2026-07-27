@@ -38,25 +38,16 @@ jobs:
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
-      - name: ⚙️ Auto-Generate Native Android Project Scaffold & Upgrade Kotlin Toolchain
+      - name: ⚙️ Auto-Generate Native Android Project Scaffold & Upgrade Kotlin 2.0.20
         run: |
           flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
-          echo "Upgrading Kotlin plugin versions to 1.9.24 across Android build settings..."
-          if [ -f "android/settings.gradle" ]; then
-            sed -i 's/version "[0-9]\+\.[0-9]\+\.[0-9]\+"/version "1.9.24"/g' android/settings.gradle || true
-            sed -i "s/version '[0-9]\+\.[0-9]\+\.[0-9]\+'/version '1.9.24'/g" android/settings.gradle || true
-          fi
-          if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = '[0-9]\+\.[0-9]\+\.[0-9]\+'/ext.kotlin_version = '1.9.24'/g" android/build.gradle || true
-            sed -i 's/ext.kotlin_version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/ext.kotlin_version = "1.9.24"/g' android/build.gradle || true
-          fi
+          echo "Upgrading Kotlin plugin versions across ALL .gradle and .gradle.kts files to 2.0.20 for AGP compatibility..."
+          find android -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.properties" \) -exec sed -i 's/1\.[6789]\.[0-9]\+/2.0.20/g' {} + || true
           echo "android.newDsl=false" >> android/gradle.properties || true
+          echo "org.gradle.jvmargs=-Xmx4G -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties || true
 
-      - name: 📦 Install Flutter Dependencies & Patch jni Toolchain
-        run: |
-          flutter pub get
-          echo "Safely removing jni-1.0.1 kotlin jvmToolchain syntax in pub-cache using Python regex..."
-          python3 -c 'import glob, os, re; [open(p, "w").write(re.sub(r"kotlin\s*\{\s*[^{}]*jvmToolchain[^{}]*\}", "", open(p).read())) for p in glob.glob(os.path.expanduser("~/.pub-cache/**/jni-*/android/build.gradle"), recursive=True)]' || true
+      - name: 📦 Install Flutter Dependencies
+        run: flutter pub get
 
       - name: 🧪 Verify Code Formatting & Lint
         run: |
@@ -130,10 +121,16 @@ jobs:
 
       - name: 🏗️ Build Unsigned Release iOS Application (.app)
         run: |
-          flutter build ios --release --no-codesign || {
-            echo "Flutter build ios reported Xcode signing notices. Enforcing Ad-Hoc physical build via xcodebuild..."
-            cd ios
-            xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE="Manual" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED="YES" CODE_SIGNING_ALLOWED="YES" AD_HOC_CODE_SIGNING_ALLOWED="YES" build
+          echo "Preparing Flutter iOS configuration and Podfile dependencies..."
+          flutter build ios --release --config-only || flutter build ios --release --no-codesign || true
+          echo "Cleaning stale Xcode artifacts and intermediate builds to eliminate outside root path conflicts..."
+          rm -rf build/ios/Release-iphoneos/*
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          cd ios
+          echo "Compiling native ARM64 release bundle without Apple Developer account credentials..."
+          xcodebuild clean build -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" -quiet || {
+            echo "Retrying compile with Ad-Hoc signing fallback..."
+            xcodebuild build -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE="Manual" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED="YES" CODE_SIGNING_ALLOWED="YES" AD_HOC_CODE_SIGNING_ALLOWED="YES" -quiet
           }
 
       - name: 📦 Package .app into Distributable iOS .IPA Payload
