@@ -52,12 +52,13 @@ jobs:
             echo "" >> android/build.gradle
             echo "subprojects { afterEvaluate { project -> if (project.name == 'jni' || project.name == 'path_provider_android' || project.name == 'shared_preferences_android') { try { project.apply plugin: 'kotlin-android' } catch (Exception e) {} } } }" >> android/build.gradle
           fi
+          echo "android.newDsl=false" >> android/gradle.properties || true
 
       - name: 📦 Install Flutter Dependencies & Patch jni Toolchain
         run: |
           flutter pub get
-          echo "Patching jni-1.0.1 kotlin jvmToolchain in pub-cache to resolve Gradle method errors..."
-          find ~/.pub-cache/ -path "*/jni-*/android/build.gradle" -exec sed -i '/jvmToolchain/d; /kotlin {/,/}/d' {} + || echo "No jni module modification needed."
+          echo "Safely removing jni-1.0.1 kotlin jvmToolchain syntax in pub-cache using Python regex..."
+          python3 -c 'import glob, os, re; [open(p, "w").write(re.sub(r"kotlin\s*\{\s*[^{}]*jvmToolchain[^{}]*\}", "", open(p).read())) for p in glob.glob(os.path.expanduser("~/.pub-cache/**/jni-*/android/build.gradle"), recursive=True)]' || true
 
       - name: 🧪 Verify Code Formatting & Lint
         run: |
@@ -132,9 +133,9 @@ jobs:
       - name: 🏗️ Build Unsigned Release iOS Application (.app)
         run: |
           flutter build ios --release --no-codesign || {
-            echo "Flutter build ios reported Xcode signing notices. Enforcing unsigned physical build via xcodebuild..."
+            echo "Flutter build ios reported Xcode signing notices. Enforcing Ad-Hoc physical build via xcodebuild..."
             cd ios
-            xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" build
+            xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE="Manual" PROVISIONING_PROFILE="" PROVISIONING_PROFILE_SPECIFIER="" DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED="YES" CODE_SIGNING_ALLOWED="YES" AD_HOC_CODE_SIGNING_ALLOWED="YES" build
           }
 
       - name: 📦 Package .app into Distributable iOS .IPA Payload
