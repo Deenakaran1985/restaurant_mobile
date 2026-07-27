@@ -30,7 +30,7 @@ class AppTheme {
       headlineMedium: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: Colors.white),
       titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: darkCardBg,
       elevation: 8,
       shape: RoundedRectangleBorder(
@@ -55,7 +55,7 @@ class AppTheme {
       headlineMedium: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
       titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: lightCardBg,
       elevation: 4,
       shape: RoundedRectangleBorder(
