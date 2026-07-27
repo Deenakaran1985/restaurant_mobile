@@ -30,7 +30,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
       - name: 💙 Setup Flutter Environment
         uses: subosito/flutter-action@v2
@@ -38,6 +37,9 @@ jobs:
           channel: 'stable'
           cache: true
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: ⚙️ Auto-Generate Native Android Project Scaffold
+        run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant .
 
       - name: 📦 Install Flutter Dependencies
         run: flutter pub get
@@ -94,12 +96,19 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
+      - name: ⚙️ Auto-Generate Native iOS Project Scaffold & CocoaPods Harness
+        run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant .
+
       - name: 📦 Install Flutter Dependencies
         run: flutter pub get
 
       - name: 🍏 Install iOS CocoaPods Dependencies
-        working-directory: ios
-        run: pod install --repo-update || echo "CocoaPods initialized automatically during flutter build"
+        run: |
+          if [ -d "ios" ]; then
+            cd ios && pod install --repo-update || echo "CocoaPods initialized automatically during flutter build"
+          else
+            echo "iOS directory will be generated during flutter build ios"
+          fi
 
       - name: 🏗️ Build Unsigned Release iOS Application (.app)
         run: flutter build ios --release --no-codesign
@@ -121,7 +130,7 @@ jobs:
   release_bundle:
     name: 🚀 Publish Automated Release Catalog
     needs: [ build_android_apk, build_ios_ipa ]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Download Android APK Artifacts
