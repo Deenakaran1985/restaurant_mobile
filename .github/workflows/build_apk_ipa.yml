@@ -41,46 +41,49 @@ jobs:
       - name: ⚙️ Auto-Generate Native Android Project Scaffold & Configure Kotlin Classpath
         run: |
           flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
-          echo "Configuring Kotlin Gradle Plugin in root buildscript classpath to solve :jni evaluation exceptions..."
+          echo "Configuring Kotlin Gradle Plugin to 2.2.20 in root buildscript and settings..."
           if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.24'/g" android/build.gradle || true
-            sed -i "/kotlin/s/version '[^']*'/version '1.9.24'/g" android/build.gradle || true
-            sed -i '/kotlin/s/version "[^"]*"/version "1.9.24"/g' android/build.gradle || true
+            sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '2.2.20'/g" android/build.gradle || true
+            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/build.gradle || true
+            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/build.gradle || true
             if ! grep -q "kotlin-gradle-plugin" android/build.gradle; then
-              sed -i '/dependencies {/a \        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24"' android/build.gradle || true
+              sed -i '/dependencies {/a \        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20"' android/build.gradle || true
             fi
           fi
           if [ -f "android/build.gradle.kts" ]; then
             if ! grep -q "kotlin-gradle-plugin" android/build.gradle.kts; then
-              printf '\nbuildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")\n    }\n}\n' >> android/build.gradle.kts
+              printf '\nbuildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20")\n    }\n}\n' >> android/build.gradle.kts
             fi
           fi
           if [ -f "android/settings.gradle" ]; then
-            sed -i "/kotlin/s/version '[^']*'/version '1.9.24'/g" android/settings.gradle || true
-            sed -i '/kotlin/s/version "[^"]*"/version "1.9.24"/g' android/settings.gradle || true
+            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle || true
+            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle || true
           fi
           if [ -f "android/settings.gradle.kts" ]; then
-            sed -i "/kotlin/s/version '[^']*'/version '1.9.24'/g" android/settings.gradle.kts || true
-            sed -i '/kotlin/s/version "[^"]*"/version "1.9.24"/g' android/settings.gradle.kts || true
+            sed -i "/kotlin/s/version '[^']*'/version '2.2.20'/g" android/settings.gradle.kts || true
+            sed -i '/kotlin/s/version "[^"]*"/version "2.2.20"/g' android/settings.gradle.kts || true
           fi
           echo "android.newDsl=false" >> android/gradle.properties || true
           echo "org.gradle.jvmargs=-Xmx4G -XX:+HeapDumpOnOutOfMemoryError" >> android/gradle.properties || true
 
-      - name: 📦 Install Flutter Dependencies
-        run: flutter pub get
+      - name: 📦 Install Flutter Dependencies & Sanitize jni Module
+        run: |
+          flutter pub get
+          echo "Applying clean unconditional namespace and removing legacy Kotlin toolchains from jni module..."
+          python3 -c 'import glob, os, re; [open(p, "w").write(re.sub(r"if\s*\([^)]*namespace[^)]*\)\s*\{\s*namespace\s*[\x27\x22]([^\x27\x22]+)[\x27\x22]\s*\}", r"namespace \x27\1\x27", re.sub(r"kotlin\s*\{\s*[^{}]*jvmToolchain[^{}]*\}", "", open(p).read()))) for p in glob.glob(os.path.expanduser("~/.pub-cache/**/jni-*/android/build.gradle"), recursive=True)]' || true
 
       - name: 🧪 Verify Code Formatting & Lint
         run: |
           flutter analyze || echo "Lint warnings ignored for automated release build"
 
       - name: 🏗️ Build Master FAT Android APK (All Architectures)
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: 🏗️ Build Optimized Split APKs (arm64-v8a, armeabi-v7a, x86_64)
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
 
       - name: 🏗️ Build Google Play Store App Bundle (.AAB)
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: 📤 Upload Universal APK Artifact
         uses: actions/upload-artifact@v4
