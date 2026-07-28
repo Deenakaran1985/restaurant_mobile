@@ -17,7 +17,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
   String hotelName = "Sriinnov Restaurant Management";
   String currencySymbol = "₹";
   String kdsMode = "thermal_printer_only";
-  String kitchenPrinterIp = "192.168.32.151";
+  String kitchenPrinterIp = ApiClient.printerIp;
   bool isLoading = false;
 
   List<Map<String, dynamic>> cart = [

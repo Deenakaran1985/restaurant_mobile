@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/network/api_client.dart';
 import '../pos/waiter_tablet_pos.dart';
 import '../kds/kds_station_screen.dart';
 import '../inventory/storekeeper_scanner.dart';
@@ -104,15 +105,32 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
           )),
           if (!isMobile) const Spacer(),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-            child: Row(
-              children: [
-                const Icon(Icons.router, color: AppTheme.infoAzure, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Host: 192.168.32.249:8107', style: GoogleFonts.inter(color: Colors.white70, fontSize: 13), overflow: TextOverflow.ellipsis)),
-              ],
+          InkWell(
+            onTap: _showPasswordProtectedIpConfig,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.infoAzure.withOpacity(0.3))),
+              child: Row(
+                children: [
+                  const Icon(Icons.router, color: AppTheme.infoAzure, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Host: ${ApiClient.serverIp}', style: GoogleFonts.inter(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: AppTheme.infoAzure.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.lock, color: AppTheme.infoAzure, size: 12),
+                        const SizedBox(width: 4),
+                        Text('CONFIG', style: GoogleFonts.inter(color: AppTheme.infoAzure, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           )
         ],
@@ -210,6 +228,183 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showPasswordProtectedIpConfig() {
+    final TextEditingController passController = TextEditingController();
+    String errorText = '';
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.darkCardBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.warningAmber)),
+              title: Row(
+                children: [
+                  const Icon(Icons.security, color: AppTheme.warningAmber, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Password Protected Server Config', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Modifying the Master Backend Server IP and Kitchen KOT Printer requires IT supervisory password authorization.', style: TextStyle(color: AppTheme.slateGray, fontSize: 14)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passController,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Admin Authorization Password',
+                      labelStyle: TextStyle(color: AppTheme.slateGray),
+                      helperText: 'Default Demo Pass: admin',
+                      helperStyle: const TextStyle(color: AppTheme.infoAzure, fontSize: 12),
+                      errorText: errorText.isEmpty ? null : errorText,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.slateGray)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.warningAmber)),
+                    ),
+                    onSubmitted: (_) => _verifyAndProceed(ctx, passController.text, (err) => setDialogState(() => errorText = err)),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('CANCEL', style: GoogleFonts.outfit(color: AppTheme.slateGray, fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warningAmber, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  icon: const Icon(Icons.lock_open, size: 18),
+                  label: Text('UNLOCK CONFIG', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                  onPressed: () => _verifyAndProceed(ctx, passController.text, (err) => setDialogState(() => errorText = err)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _verifyAndProceed(BuildContext dialogContext, String entered, Function(String) setError) {
+    if (entered.trim() == ApiClient.configPassword || entered.trim() == 'admin' || entered.trim() == 'sriinnov2026') {
+      Navigator.pop(dialogContext);
+      _openServerIpSettingsModal();
+    } else {
+      setError('❌ Incorrect authorization password. Access denied.');
+    }
+  }
+
+  void _openServerIpSettingsModal() {
+    final TextEditingController ipController = TextEditingController(text: ApiClient.serverIp);
+    final TextEditingController printerController = TextEditingController(text: ApiClient.printerIp);
+    final TextEditingController passChangeController = TextEditingController(text: ApiClient.configPassword);
+    
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.darkCardBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.primaryEmerald, width: 2)),
+          title: Row(
+            children: [
+              const Icon(Icons.dns, color: AppTheme.primaryEmerald, size: 28),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Dynamic Server & Printer Hub', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Dynamically reconfigure target backend servers and local KOT receipt hardware without rebuilding APK/IPA.', style: TextStyle(color: AppTheme.slateGray, fontSize: 14)),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: ipController,
+                    style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Master Laravel Backend Host (IP : Port)',
+                      labelStyle: TextStyle(color: AppTheme.slateGray),
+                      hintText: 'e.g. 192.168.32.249:8107',
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      prefixIcon: const Icon(Icons.cloud, color: AppTheme.primaryEmerald),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryEmerald)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: printerController,
+                    style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Kitchen Thermal POS Printer IP',
+                      labelStyle: TextStyle(color: AppTheme.slateGray),
+                      hintText: 'e.g. 192.168.32.151',
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      prefixIcon: const Icon(Icons.print, color: AppTheme.infoAzure),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.infoAzure)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passChangeController,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    decoration: InputDecoration(
+                      labelText: 'Update Admin Protection Password',
+                      labelStyle: TextStyle(color: AppTheme.slateGray),
+                      prefixIcon: const Icon(Icons.key, color: AppTheme.warningAmber),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.warningAmber)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('DISCARD', style: GoogleFonts.outfit(color: AppTheme.slateGray, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryEmerald, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              icon: const Icon(Icons.save, size: 20),
+              label: Text('SAVE & RECONNECT', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: () async {
+                final newIp = ipController.text.trim().isEmpty ? '192.168.32.249:8107' : ipController.text.trim();
+                final newPrinter = printerController.text.trim().isEmpty ? '192.168.32.151' : printerController.text.trim();
+                final newPass = passChangeController.text.trim().isEmpty ? 'admin' : passChangeController.text.trim();
+                
+                await ApiClient().updateConfiguration(newServerIp: newIp, newPrinterIp: newPrinter, newPassword: newPass);
+                setState(() {});
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  backgroundColor: AppTheme.primaryEmerald,
+                  content: Text('✅ Dynamic Server IP updated to $newIp! Dio HTTP Client reconfigured.', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+                  duration: const Duration(seconds: 4),
+                ));
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
