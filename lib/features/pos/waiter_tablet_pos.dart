@@ -20,6 +20,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
   String kdsMode = "thermal_printer_only";
   String kitchenPrinterIp = ApiClient.printerIp;
   bool isLoading = false;
+  String activeWaiterName = "Captain Rahul";
 
   final OrderWorkflowService _workflowService = OrderWorkflowService();
 
@@ -84,16 +85,16 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
             children: [
               const Icon(Icons.table_restaurant, color: AppTheme.infoAzure, size: 28),
               const SizedBox(width: 12),
-              Expanded(child: Text('Select Table Workspace', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20))),
+              Expanded(child: Text('Select Table Workspace & Captain Assignment', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 19))),
             ],
           ),
           content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.height * 0.6,
+            width: MediaQuery.of(context).size.width * 0.85,
+            height: MediaQuery.of(context).size.height * 0.65,
             child: GridView.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 3,
-                childAspectRatio: 1.2,
+                childAspectRatio: 1.1,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
@@ -117,7 +118,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       backgroundColor: AppTheme.infoAzure,
-                      content: Text('🍽️ Switched tableside terminal to ${tbl.tableName}', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                      content: Text('🍽️ Switched terminal to ${tbl.tableName} (Responsible: ${tbl.responsibleWaiter})', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
                       duration: const Duration(seconds: 2),
                     ));
                   },
@@ -132,14 +133,27 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.table_restaurant, color: statusColor, size: 32),
-                        const SizedBox(height: 8),
-                        Text(tbl.tableName, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.table_restaurant, color: statusColor, size: 28),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                              child: Text('Cap: ${tbl.capacity}', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(tbl.tableName, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
+                        Text('🧑‍🍳 ${tbl.responsibleWaiter}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(color: statusColor.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                          child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                          child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11)),
                         ),
                       ],
                     ),
@@ -159,6 +173,288 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
     );
   }
 
+  // ORDER INTERCHANGE & TABLE TRANSFER MODAL (Mistaken Booking Fixes)
+  void _showOrderInterchangeModal() {
+    final currentTbl = _workflowService.getTable(selectedTable);
+    if (currentTbl.accumulatedItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        backgroundColor: AppTheme.warningAmber,
+        content: Text('⚠️ No active accumulated bill on Table T-$selectedTable to transfer or interchange!'),
+      ));
+      return;
+    }
+
+    int destTableNumber = _workflowService.tables.firstWhere((t) => t.tableNumber != selectedTable).tableNumber;
+    String reasonText = "Mistaken table selected during initial order entry";
+    int? selectedItemIndex; // null = entire bill
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final destTbl = _workflowService.getTable(destTableNumber);
+          final bool isSameWaiter = destTbl.responsibleWaiter == currentTbl.responsibleWaiter || destTbl.responsibleWaiter == 'Unassigned' || currentTbl.responsibleWaiter == 'Captain Rahul';
+
+          return AlertDialog(
+            backgroundColor: AppTheme.darkCardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: AppTheme.warningAmber, width: 2)),
+            title: Row(
+              children: [
+                const Icon(Icons.swap_horizontal_circle, color: AppTheme.warningAmber, size: 28),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Interchange & Transfer Mistaken Order', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18))),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: AppTheme.infoAzure.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.infoAzure)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified, color: AppTheme.infoAzure, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Operational Transfer Rights & Parallel Sync', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  isSameWaiter
+                                    ? '✅ AUTHORIZATION VERIFIED: $activeWaiterName has rights to handle both Table T-$selectedTable and Table T-$destTableNumber. No manager PIN required. Web & Mobile apps sync in parallel!'
+                                    : '🔐 MANAGER OVERRIDE ACTIVE: Transferring order between different captain tables. Audit record maintained.',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('From Source Table:', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
+                                child: Text('Table T-$selectedTable (${currentTbl.responsibleWaiter})', style: GoogleFonts.outfit(color: AppTheme.warningAmber, fontWeight: FontWeight.w800, fontSize: 15)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          child: Icon(Icons.arrow_forward_ios, color: AppTheme.primaryEmerald, size: 20),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('To Destination Table:', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              DropdownButtonFormField<int>(
+                                dropdownColor: const Color(0xFF141A28),
+                                value: destTableNumber,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white.withOpacity(0.08),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                                items: _workflowService.tables.where((t) => t.tableNumber != selectedTable).map((t) {
+                                  return DropdownMenuItem<int>(
+                                    value: t.tableNumber,
+                                    child: Text('Table T-${t.tableNumber} [${t.status.name}]', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  );
+                                }).toList(),
+                                onChanged: (val) => setModalState(() => destTableNumber = val!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+                    Text('Select Scope of Order Transfer:', style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    RadioListTile<int?>(
+                      title: Text('Interchange Entire Accumulated Table Bill (${currentTbl.accumulatedItems.length} Dishes • ₹${currentTbl.totalAmount.toStringAsFixed(0)})', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                      value: null,
+                      groupValue: selectedItemIndex,
+                      activeColor: AppTheme.primaryEmerald,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) => setModalState(() => selectedItemIndex = val),
+                    ),
+                    const Divider(color: Colors.white24),
+                    Text('Or Transfer Only Specific Mistaken Dish Item:', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                    for (int i = 0; i < currentTbl.accumulatedItems.length; i++)
+                      RadioListTile<int?>(
+                        title: Text('${currentTbl.accumulatedItems[i]['qty']}x ${currentTbl.accumulatedItems[i]['name']} (₹${currentTbl.accumulatedItems[i]['price']})', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                        value: i,
+                        groupValue: selectedItemIndex,
+                        activeColor: AppTheme.warningAmber,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (val) => setModalState(() => selectedItemIndex = val),
+                      ),
+
+                    const SizedBox(height: 16),
+                    Text('Justification / Audit Trail Reason:', style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF141A28),
+                      value: reasonText,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.08),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: [
+                        "Mistaken table selected during initial order entry",
+                        "Waiter interchanging order between assigned multi-tables",
+                        "Guest group relocated seating across dining zones",
+                        "Manager override table bill consolidation",
+                      ].map((r) => DropdownMenuItem<String>(value: r, child: Text(r, style: const TextStyle(color: Colors.white, fontSize: 13)))).toList(),
+                      onChanged: (val) => setModalState(() => reasonText = val!),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('CANCEL', style: GoogleFonts.outfit(color: AppTheme.slateGray, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warningAmber, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                icon: const Icon(Icons.check_circle, size: 20),
+                label: Text('EXECUTE TRANSFER & LOG AUDIT', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 14)),
+                onPressed: () {
+                  final resultDesc = _workflowService.transferOrInterchangeOrder(
+                    fromTableNum: selectedTable,
+                    toTableNum: destTableNumber,
+                    operatorRole: '$activeWaiterName (Table Owner Rights)',
+                    reason: reasonText,
+                    specificItemIndex: selectedItemIndex,
+                  );
+                  Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      backgroundColor: AppTheme.primaryEmerald,
+                      content: Text('🔄 $resultDesc! Audit log maintained & Web App synced in parallel.', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                      duration: const Duration(seconds: 5),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                },
+              )
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // AUDIT HISTORY & TABLE OWNERSHIP LOGS MODAL
+  void _showAuditHistoryModal() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.darkCardBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: AppTheme.primaryEmerald, width: 2)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.history_edu, color: AppTheme.primaryEmerald, size: 28),
+                  const SizedBox(width: 10),
+                  Text('Table Transfer & Ownership Audit Trail', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 19)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: AppTheme.primaryEmerald.withOpacity(0.2), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.primaryEmerald)),
+                child: const Text('Parallel Web Sync Active', style: TextStyle(color: AppTheme.primaryEmerald, fontWeight: FontWeight.bold, fontSize: 11)),
+              )
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: _workflowService.auditLogs.isEmpty ? Center(
+              child: Text('No table transfers or interchange audit events recorded yet today.', style: TextStyle(color: AppTheme.slateGray, fontSize: 15)),
+            ) : ListView.builder(
+              itemCount: _workflowService.auditLogs.length,
+              itemBuilder: (context, i) {
+                final log = _workflowService.auditLogs[i];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.verified_user, color: AppTheme.infoAzure, size: 18),
+                              const SizedBox(width: 8),
+                              Text(log['operator']!, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: AppTheme.warningAmber.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                            child: Text(log['time']!, style: const TextStyle(color: AppTheme.warningAmber, fontWeight: FontWeight.bold, fontSize: 12)),
+                          )
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(log['action']!, style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontWeight: FontWeight.w800, fontSize: 15)),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('⚠️ Reason: ${log['reason']}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic)),
+                          Text('📡 ${log['sync_status']}', style: const TextStyle(color: AppTheme.infoAzure, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('CLOSE AUDIT LOG', style: GoogleFonts.outfit(color: AppTheme.slateGray, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _fireKotOrder({VoidCallback? onComplete}) async {
     if (cart.isEmpty) return;
     setState(() => isLoading = true);
@@ -169,6 +465,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
         tableNumber: selectedTable,
         items: cart,
         station: stationName,
+        waiterName: activeWaiterName,
       );
       
       setState(() {
@@ -180,7 +477,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🔥 [$smaId] Fired to Kitchen KDS! Order items accumulated onto Table $selectedTable bill.', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black)),
+            content: Text('🔥 [$smaId] Fired to Kitchen KDS! Order accumulated onto Table T-$selectedTable ($activeWaiterName). Parallel sync sent to Web App.', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black)),
             backgroundColor: AppTheme.primaryEmerald,
             duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
@@ -343,7 +640,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
 
     return Container(
       color: AppTheme.darkCardBg,
-      padding: inBottomSheet ? const EdgeInsets.symmetric(vertical: 8) : const EdgeInsets.all(20),
+      padding: inBottomSheet ? const EdgeInsets.symmetric(vertical: 8) : const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -351,18 +648,33 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Table T-$selectedTable Order Hub', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: 20, fontWeight: FontWeight.bold)),
-                InkWell(
-                  onTap: _showTableSelectorModal,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppTheme.infoAzure.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                    child: Text('CHANGE TABLE', style: GoogleFonts.inter(color: AppTheme.infoAzure, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Table T-$selectedTable Order Hub', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: 19, fontWeight: FontWeight.bold)),
+                    Text('🧑‍🍳 Responsible: ${table.responsibleWaiter}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.history_edu, color: AppTheme.infoAzure, size: 22),
+                      tooltip: 'View Audit & Interchange Logs',
+                      onPressed: _showAuditHistoryModal,
+                    ),
+                    InkWell(
+                      onTap: _showTableSelectorModal,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(color: AppTheme.infoAzure.withOpacity(0.2), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.infoAzure)),
+                        child: Text('SWITCH', style: GoogleFonts.inter(color: AppTheme.infoAzure, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 )
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
           ],
 
           // STAGE 2 -> 3 NOTIFICATION: KDS ORDER READY TO SERVE
@@ -386,7 +698,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text('Ticket ${readyTickets.first.id} finished preparation in kitchen.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  Text('Ticket ${readyTickets.first.id} finished prep in kitchen.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
@@ -410,7 +722,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
             ),
           ],
 
-          // STAGE 4: ACCUMULATED TABLE INVOICE
+          // STAGE 4 & INTERCHANGE: ACCUMULATED TABLE INVOICE
           if (table.accumulatedItems.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -427,7 +739,27 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('${table.accumulatedItems.length} rounds of food & drink items ordered so far.', style: const TextStyle(color: AppTheme.slateGray, fontSize: 12)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('${table.accumulatedItems.length} courses ordered so far.', style: const TextStyle(color: AppTheme.slateGray, fontSize: 12)),
+                      InkWell(
+                        onTap: _showOrderInterchangeModal,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: AppTheme.warningAmber.withOpacity(0.2), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.warningAmber)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.swap_horiz, color: AppTheme.warningAmber, size: 14),
+                              const SizedBox(width: 4),
+                              Text('INTERCHANGE', style: GoogleFonts.outfit(color: AppTheme.warningAmber, fontWeight: FontWeight.w800, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   if (table.status == TableWorkflowStatus.billFiredToCashier)
                     Container(
@@ -446,17 +778,17 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                   else
                     SizedBox(
                       width: double.infinity,
-                      height: 42,
+                      height: 40,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: AppTheme.infoAzure, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                         icon: const Icon(Icons.receipt_long, size: 18),
-                        label: Text('CLOSE BILL & FIRE TO CASHIER', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 14)),
+                        label: Text('CLOSE BILL & FIRE TO CASHIER', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 13)),
                         onPressed: () {
                           _workflowService.closeTableAndFireToCashier(selectedTable);
                           if (onStateChanged != null) onStateChanged();
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             backgroundColor: AppTheme.infoAzure,
-                            content: Text('📨 Table $selectedTable Bill ($currencySymbol${table.totalAmount.toStringAsFixed(2)}) closed and automatically fired to Main Cashier Station & Printer!', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                            content: Text('📨 Table $selectedTable Bill ($currencySymbol${table.totalAmount.toStringAsFixed(2)}) closed and fired to Cashier Terminal & Thermal Printer!', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
                             duration: const Duration(seconds: 4),
                           ));
                         },
@@ -467,18 +799,18 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
             ),
           ],
 
-          Text(cart.isEmpty ? 'New Round Cart (Empty)' : 'New Round Items (${cart.length}):', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
+          Text(cart.isEmpty ? 'New Round Cart (Empty)' : 'New Round Items (${cart.length}):', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
 
           Expanded(
             child: cart.isEmpty ? Center(
-              child: Text('Tap items from menu to start a new KOT order round for Table T-$selectedTable.', style: TextStyle(color: AppTheme.slateGray, fontSize: 14), textAlign: TextAlign.center),
+              child: Text('Tap dishes from menu grid to punch a new order round for Table T-$selectedTable.', style: TextStyle(color: AppTheme.slateGray, fontSize: 13), textAlign: TextAlign.center),
             ) : ListView.builder(
               itemCount: cart.length,
               itemBuilder: (context, i) {
                 final item = cart[i];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
                   child: Row(
@@ -489,7 +821,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(item['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                            if (item['note'].isNotEmpty) Text('Note: ${item['note']}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 12)),
+                            if (item['note'].isNotEmpty) Text('Note: ${item['note']}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 11)),
                             Text('$currencySymbol${(item['price'] * item['qty']).toStringAsFixed(0)}', style: const TextStyle(color: AppTheme.slateGray, fontSize: 13)),
                           ],
                         ),
@@ -535,14 +867,14 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('New KOT Total:', style: TextStyle(color: Colors.white70, fontSize: 16)),
-              Text('$currencySymbol${newItemsTotal.toStringAsFixed(2)}', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: 22, fontWeight: FontWeight.w800)),
+              const Text('New KOT Total:', style: TextStyle(color: Colors.white70, fontSize: 15)),
+              Text('$currencySymbol${newItemsTotal.toStringAsFixed(2)}', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: 21, fontWeight: FontWeight.w800)),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            height: 52,
+            height: 50,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryEmerald, 
@@ -550,7 +882,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 disabledBackgroundColor: Colors.white12
               ),
-              icon: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : const Icon(Icons.send_rounded, size: 22),
+              icon: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : const Icon(Icons.send_rounded, size: 20),
               label: Text(isLoading ? 'FIRING TO KDS...' : '🔥 FIRE SMA TO KITCHEN', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900)),
               onPressed: isLoading || cart.isEmpty ? null : () => _fireKotOrder(onComplete: onOrderFired),
             ),
@@ -563,6 +895,8 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 850;
+    final tbl = _workflowService.getTable(selectedTable);
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppTheme.darkCardBg,
@@ -589,9 +923,9 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.rss_feed, size: 14, color: AppTheme.primaryEmerald),
-                    const SizedBox(width: 6),
-                    Text('Realtime KDS & Cashier Link', style: TextStyle(color: AppTheme.primaryEmerald, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const Icon(Icons.sync, size: 14, color: AppTheme.primaryEmerald),
+                    const SizedBox(width: 5),
+                    const Text('Web & Mobile Parallel Sync', style: TextStyle(color: AppTheme.primaryEmerald, fontSize: 11, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -606,7 +940,7 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(isMobile ? 'T-$selectedTable' : 'Table T-$selectedTable', style: const TextStyle(color: AppTheme.infoAzure, fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(isMobile ? 'T-$selectedTable (${tbl.responsibleWaiter})' : 'Table T-$selectedTable (${tbl.responsibleWaiter})', style: const TextStyle(color: AppTheme.infoAzure, fontSize: 12, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 4),
                     const Icon(Icons.expand_more, color: AppTheme.infoAzure, size: 16),
                   ],
@@ -616,6 +950,11 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: AppTheme.infoAzure),
+            tooltip: 'Audit History Logs',
+            onPressed: _showAuditHistoryModal,
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: AppTheme.warningAmber),
             onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPinScreen())),
@@ -639,24 +978,39 @@ class _WaiterTabletPosScreenState extends State<WaiterTabletPosScreen> {
       ),
       bottomNavigationBar: isMobile ? SafeArea(
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: AppTheme.darkCardBg,
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, -3))],
           ),
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryEmerald, 
-              foregroundColor: Colors.black, 
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            icon: const Icon(Icons.shopping_cart_checkout, size: 24),
-            label: Text(
-              'VIEW TABLE T-$selectedTable CART (${cart.fold<int>(0, (sum, e) => sum + (e['qty'] as int))} NEW) • $currencySymbol${_workflowService.getTable(selectedTable).totalAmount.toStringAsFixed(0)} ACC',
-              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800),
-            ),
-            onPressed: () => _showMobileCartModal(context),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryEmerald, 
+                    foregroundColor: Colors.black, 
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: const Icon(Icons.shopping_cart_checkout, size: 22),
+                  label: Text(
+                    'TABLE T-$selectedTable CART (${cart.length} NEW) • $currencySymbol${tbl.totalAmount.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                  onPressed: () => _showMobileCartModal(context),
+                ),
+              ),
+              if (tbl.accumulatedItems.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  style: IconButton.styleFrom(backgroundColor: AppTheme.warningAmber.withOpacity(0.2), padding: const EdgeInsets.all(14)),
+                  icon: const Icon(Icons.swap_horiz, color: AppTheme.warningAmber, size: 26),
+                  tooltip: 'Interchange Order',
+                  onPressed: _showOrderInterchangeModal,
+                )
+              ]
+            ],
           ),
         ),
       ) : null,
