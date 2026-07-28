@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/network/api_client.dart';
 import '../pos/waiter_tablet_pos.dart';
+import '../pos/cashier_settlement_screen.dart';
 import '../kds/kds_station_screen.dart';
 import '../inventory/storekeeper_scanner.dart';
 
@@ -35,8 +36,10 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
 
   void verifyAndRedirect() {
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (activeRole == 'waiter' || activeRole == 'cashier') {
+      if (activeRole == 'waiter') {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const WaiterTabletPosScreen()));
+      } else if (activeRole == 'cashier') {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CashierSettlementScreen()));
       } else if (activeRole == 'chef') {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const KdsStationScreen()));
       } else {

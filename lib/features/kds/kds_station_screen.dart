@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/order_workflow_service.dart';
 import '../auth/login_screen.dart';
 
 class KdsStationScreen extends StatefulWidget {
@@ -11,34 +12,30 @@ class KdsStationScreen extends StatefulWidget {
 }
 
 class _KdsStationScreenState extends State<KdsStationScreen> {
-  List<Map<String, dynamic>> tickets = [
-    {
-      'id': 'ORD-0092',
-      'table': 'Table T-3 (Main Lounge)',
-      'time': '14m ago',
-      'urgent': true,
-      'station': 'Wood-Fired Oven',
-      'items': [
-        {'name': 'Truffle & Forest Mushroom Pizza', 'qty': 1, 'note': 'Extra crisp edge'},
-      ]
-    },
-    {
-      'id': 'ORD-0094',
-      'table': 'Table T-5 (Rooftop Garden)',
-      'time': '4m ago',
-      'urgent': false,
-      'station': 'Bar / Beverages',
-      'items': [
-        {'name': 'Iced Hazelnut Caramel Latte', 'qty': 2, 'note': 'Less Sugar'},
-        {'name': 'Warm Belgian Lava Cake', 'qty': 1, 'note': 'Add Vanilla Scoop'},
-      ]
-    }
-  ];
+  final OrderWorkflowService _workflowService = OrderWorkflowService();
+
+  @override
+  void initState() {
+    super.initState();
+    _workflowService.addListener(_onServiceUpdate);
+  }
+
+  @override
+  void dispose() {
+    _workflowService.removeListener(_onServiceUpdate);
+    super.dispose();
+  }
+
+  void _onServiceUpdate() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 750;
+    final tickets = _workflowService.activeKitchenTickets;
+
     return Scaffold(
       backgroundColor: const Color(0xFF090D16), // Ultra dark kitchen ambiance
       appBar: AppBar(
@@ -80,26 +77,32 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
             children: [
               const Icon(Icons.check_circle_outline, color: AppTheme.primaryEmerald, size: 80),
               const SizedBox(height: 16),
-              Text('All Kitchen Orders Served!', style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-              Text('Waiting for Waiters to fire new KOTs over WebSockets...', style: TextStyle(color: AppTheme.slateGray, fontSize: 16)),
+              Text('All Kitchen SMA Orders Ready or Served!', style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Waiting for Waiters to fire new SMA orders over WebSockets...', style: TextStyle(color: AppTheme.slateGray, fontSize: 16)),
             ],
           ),
         ) : GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: screenWidth < 600 ? 1 : (screenWidth < 1000 ? 2 : 3),
-            childAspectRatio: screenWidth < 600 ? 1.25 : 0.95,
+            childAspectRatio: screenWidth < 600 ? 1.15 : 0.9,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
           ),
           itemCount: tickets.length,
           itemBuilder: (context, index) {
             final t = tickets[index];
-            final isUrgent = t['urgent'] as bool;
+            final isUrgent = t.isUrgent;
+            final isReady = t.status == KotStatus.readyToServe;
+
             return Container(
               decoration: BoxDecoration(
                 color: AppTheme.darkCardBg,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isUrgent ? AppTheme.accentCrimson : AppTheme.infoAzure, width: isUrgent ? 2.5 : 1),
+                border: Border.all(
+                  color: isReady ? AppTheme.warningAmber : (isUrgent ? AppTheme.accentCrimson : AppTheme.infoAzure),
+                  width: isReady || isUrgent ? 2.5 : 1,
+                ),
               ),
               child: Column(
                 children: [
@@ -107,7 +110,7 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isUrgent ? AppTheme.accentCrimson.withOpacity(0.2) : AppTheme.infoAzure.withOpacity(0.15),
+                      color: isReady ? AppTheme.warningAmber.withOpacity(0.2) : (isUrgent ? AppTheme.accentCrimson.withOpacity(0.2) : AppTheme.infoAzure.withOpacity(0.15)),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
                     ),
                     child: Row(
@@ -116,14 +119,21 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(t['id'], style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                            Text(t['table'], style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                            Text('${t.id} • ${t.station}', style: GoogleFonts.outfit(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 2),
+                            Text(t.tableName, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: isUrgent ? AppTheme.accentCrimson : AppTheme.warningAmber, borderRadius: BorderRadius.circular(10)),
-                          child: Text(t['time'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          decoration: BoxDecoration(
+                            color: isReady ? AppTheme.warningAmber : (isUrgent ? AppTheme.accentCrimson : AppTheme.primaryEmerald),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            isReady ? 'READY TO SERVE' : (isUrgent ? 'URGENT FIRING' : 'PREPARING'),
+                            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
                         )
                       ],
                     ),
@@ -132,9 +142,9 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: (t['items'] as List).length,
+                      itemCount: t.items.length,
                       itemBuilder: (context, itemIdx) {
-                        final item = t['items'][itemIdx];
+                        final item = t.items[itemIdx];
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(12),
@@ -147,13 +157,13 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(color: AppTheme.primaryEmerald, borderRadius: BorderRadius.circular(6)),
-                                    child: Text('${item['qty']}x', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    child: Text('${item['qty']}x', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(child: Text(item['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
                                 ],
                               ),
-                              if (item['note'] != null && item['note'].isNotEmpty)
+                              if (item['note'] != null && item['note'].toString().isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6, left: 34),
                                   child: Text('⚠️ Note: ${item['note']}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -172,15 +182,29 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
                       height: 54,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isUrgent ? AppTheme.accentCrimson : AppTheme.primaryEmerald,
-                          foregroundColor: Colors.white,
+                          backgroundColor: isReady ? AppTheme.infoAzure : (isUrgent ? AppTheme.accentCrimson : AppTheme.primaryEmerald),
+                          foregroundColor: isReady || !isUrgent ? Colors.black : Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        icon: const Icon(Icons.done_all),
-                        label: Text('MARK SERVED & DEDUCT COGS', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold)),
+                        icon: Icon(isReady ? Icons.room_service : Icons.flatware),
+                        label: Text(
+                          isReady ? 'READY FOR WAITER PICKUP' : '👨‍🍳 MARK READY TO SERVE',
+                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900),
+                        ),
                         onPressed: () {
-                          setState(() => tickets.removeAt(index));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket marked ready! Automated recipe inventory deduction triggered via backend.')));
+                          if (!isReady) {
+                            _workflowService.markTicketReadyToServe(t.id);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              backgroundColor: AppTheme.primaryEmerald,
+                              content: Text('✅ ${t.id} marked READY TO SERVE! Waiter notified tableside for pickup.', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+                              duration: const Duration(seconds: 3),
+                            ));
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              backgroundColor: AppTheme.warningAmber,
+                              content: Text('🍽️ Dish already marked Ready to Serve! Waiting for Waiter to mark Served.', style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                            ));
+                          }
                         },
                       ),
                     ),
