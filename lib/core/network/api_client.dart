@@ -6,7 +6,7 @@ class ApiClient {
   factory ApiClient() => _instance;
 
   late final Dio dio;
-  static const String baseUrl = 'http://192.168.32.249:8107/api';
+  static const String baseUrl = 'http://14.139.184.39:8107/api';
 
   ApiClient._internal() {
     dio = Dio(

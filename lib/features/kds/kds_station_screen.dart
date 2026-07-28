@@ -37,6 +37,8 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 750;
     return Scaffold(
       backgroundColor: const Color(0xFF090D16), // Ultra dark kitchen ambiance
       appBar: AppBar(
@@ -45,20 +47,24 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
           children: [
             const Icon(Icons.display_settings, color: AppTheme.warningAmber),
             const SizedBox(width: 10),
-            Text('Kitchen Touch Display (KDS Station)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(color: AppTheme.warningAmber.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.warningAmber)),
-              child: Row(
-                children: [
-                  const Icon(Icons.volume_up, color: AppTheme.warningAmber, size: 18),
-                  const SizedBox(width: 6),
-                  Text('BUZZER CHIME ACTIVE', style: GoogleFonts.inter(color: AppTheme.warningAmber, fontWeight: FontWeight.bold, fontSize: 13)),
-                ],
-              ),
+            Flexible(
+              child: Text('Kitchen Touch Display (KDS Station)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: isMobile ? 16 : 18), overflow: TextOverflow.ellipsis),
             ),
-            const SizedBox(width: 16),
+            if (!isMobile) ...[
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(color: AppTheme.warningAmber.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.warningAmber)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.volume_up, color: AppTheme.warningAmber, size: 18),
+                    const SizedBox(width: 6),
+                    Text('BUZZER CHIME ACTIVE', style: GoogleFonts.inter(color: AppTheme.warningAmber, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.logout, color: AppTheme.accentCrimson),
               onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPinScreen())),
@@ -79,9 +85,9 @@ class _KdsStationScreenState extends State<KdsStationScreen> {
             ],
           ),
         ) : GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 0.95,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: screenWidth < 600 ? 1 : (screenWidth < 1000 ? 2 : 3),
+            childAspectRatio: screenWidth < 600 ? 1.25 : 0.95,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
           ),

@@ -44,132 +44,157 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
     });
   }
 
+  Widget _buildRoleSelection({required bool isMobile}) {
+    return Container(
+      color: const Color(0xFF0B0F19),
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: isMobile ? MainAxisAlignment.start : MainAxisAlignment.center,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text('SRIINNOV RESTAURANT MANAGEMENT', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: isMobile ? 22 : 26, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(height: 8),
+          Text('Select Terminal Workspace Mode', style: GoogleFonts.inter(color: AppTheme.slateGray, fontSize: isMobile ? 14 : 15)),
+          const SizedBox(height: 24),
+          ...demoAccounts.entries.map((e) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: () => setState(() { activeRole = e.key; enteredPin = ''; }),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: EdgeInsets.all(isMobile ? 12 : 16),
+                decoration: BoxDecoration(
+                  color: activeRole == e.key ? AppTheme.primaryEmerald.withOpacity(0.2) : Colors.white.withOpacity(0.04),
+                  border: Border.all(color: activeRole == e.key ? AppTheme.primaryEmerald : Colors.white.withOpacity(0.08)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Text(e.value['icon']!, style: TextStyle(fontSize: isMobile ? 24 : 28)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(e.value['label']!, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: isMobile ? 15 : 16)),
+                          Text(e.value['desc']!, style: TextStyle(color: AppTheme.slateGray, fontSize: isMobile ? 12 : 13)),
+                        ],
+                      ),
+                    ),
+                    if (activeRole == e.key) const Icon(Icons.check_circle, color: AppTheme.primaryEmerald),
+                  ],
+                ),
+              ),
+            ),
+          )),
+          if (!isMobile) const Spacer(),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+            child: Row(
+              children: [
+                const Icon(Icons.router, color: AppTheme.infoAzure, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Host: 192.168.32.249:8107', style: GoogleFonts.inter(color: Colors.white70, fontSize: 13), overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPinPad({required bool isMobile}) {
+    return Container(
+      color: AppTheme.darkCardBg,
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('Enter Fast Switch PIN', style: GoogleFonts.outfit(color: Colors.white, fontSize: isMobile ? 22 : 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('Demo PIN for ${demoAccounts[activeRole]!['label']}: ${demoAccounts[activeRole]!['pin']}', style: TextStyle(color: AppTheme.warningAmber, fontSize: isMobile ? 13 : 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 24),
+          // PIN Dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(4, (i) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              width: 20, height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < enteredPin.length ? AppTheme.primaryEmerald : Colors.transparent,
+                border: Border.all(color: AppTheme.primaryEmerald, width: 2),
+              ),
+            )),
+          ),
+          const SizedBox(height: 36),
+          // Numpad Grid
+          SizedBox(
+            width: isMobile ? 260 : 300,
+            child: GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 3,
+              childAspectRatio: 1.25,
+              mainAxisSpacing: isMobile ? 12 : 16,
+              crossAxisSpacing: isMobile ? 12 : 16,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                for (var d in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '←'])
+                  InkWell(
+                    onTap: () {
+                      if (d == 'C') setState(() => enteredPin = '');
+                      else if (d == '←' && enteredPin.isNotEmpty) setState(() => enteredPin = enteredPin.substring(0, enteredPin.length - 1));
+                      else if (d != 'C' && d != '←') onDigitTap(d);
+                    },
+                    borderRadius: BorderRadius.circular(50),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: d == 'C' ? AppTheme.accentCrimson.withOpacity(0.2) : Colors.white.withOpacity(0.06),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(d, style: GoogleFonts.outfit(color: d == 'C' ? AppTheme.accentCrimson : Colors.white, fontSize: isMobile ? 20 : 22, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 800;
     return Scaffold(
-      body: Row(
+      backgroundColor: const Color(0xFF0B0F19),
+      body: isMobile ? SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildRoleSelection(isMobile: true),
+              const Divider(color: Colors.white24, height: 1),
+              _buildPinPad(isMobile: true),
+            ],
+          ),
+        ),
+      ) : Row(
         children: [
           // Left Sidebar: Operational Role Selection
           Expanded(
             flex: 4,
-            child: Container(
-              color: const Color(0xFF0B0F19),
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('ANTIGRAVITY ERP', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: 28, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  Text('Select Terminal Workspace Mode', style: GoogleFonts.inter(color: AppTheme.slateGray, fontSize: 15)),
-                  const SizedBox(height: 32),
-                  ...demoAccounts.entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      onTap: () => setState(() { activeRole = e.key; enteredPin = ''; }),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: activeRole == e.key ? AppTheme.primaryEmerald.withOpacity(0.2) : Colors.white.withOpacity(0.04),
-                          border: Border.all(color: activeRole == e.key ? AppTheme.primaryEmerald : Colors.white.withOpacity(0.08)),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(e.value['icon']!, style: const TextStyle(fontSize: 28)),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(e.value['label']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                  Text(e.value['desc']!, style: TextStyle(color: AppTheme.slateGray, fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                            if (activeRole == e.key) const Icon(Icons.check_circle, color: AppTheme.primaryEmerald),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.router, color: AppTheme.infoAzure, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Host: 192.168.32.249:8107', style: GoogleFonts.inter(color: Colors.white70, fontSize: 13)),
-                      ],
-                    ),
-                  )
-                ],
-              ),
-            ),
+            child: _buildRoleSelection(isMobile: false),
           ),
           // Right Panel: 4-Digit Touch PIN Pad
           Expanded(
             flex: 5,
-            child: Container(
-              color: AppTheme.darkCardBg,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Enter Fast Switch PIN', style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Demo PIN for ${demoAccounts[activeRole]!['label']}: ${demoAccounts[activeRole]!['pin']}', style: const TextStyle(color: AppTheme.warningAmber, fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 32),
-                  // PIN Dots
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(4, (i) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      width: 22, height: 22,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: i < enteredPin.length ? AppTheme.primaryEmerald : Colors.transparent,
-                        border: Border.all(color: AppTheme.primaryEmerald, width: 2),
-                      ),
-                    )),
-                  ),
-                  const SizedBox(height: 48),
-                  // Numpad Grid
-                  SizedBox(
-                    width: 300,
-                    child: GridView.count(
-                      shrinkWrap: true,
-                      crossAxisCount: 3,
-                      childAspectRatio: 1.2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        for (var d in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '←'])
-                          InkWell(
-                            onTap: () {
-                              if (d == 'C') setState(() => enteredPin = '');
-                              else if (d == '←' && enteredPin.isNotEmpty) setState(() => enteredPin = enteredPin.substring(0, enteredPin.length - 1));
-                              else if (d != 'C' && d != '←') onDigitTap(d);
-                            },
-                            borderRadius: BorderRadius.circular(50),
-                            child: Container(
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: d == 'C' ? AppTheme.accentCrimson.withOpacity(0.2) : Colors.white.withOpacity(0.06),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(d, style: GoogleFonts.outfit(color: d == 'C' ? AppTheme.accentCrimson : Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildPinPad(isMobile: false),
           ),
         ],
       ),

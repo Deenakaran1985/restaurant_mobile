@@ -14,7 +14,7 @@ class RestaurantEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Antigravity POS & KDS',
+      title: 'Sriinnov Restaurant Management',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
