@@ -49,13 +49,16 @@ jobs:
           python3 .github/scripts/sanitize_pub_cache.py
 
       - name: 🏗️ Build Master Universal Android APK
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        run: |
+          flutter build apk --release --android-skip-build-dependency-validation
+          cp build/app/outputs/flutter-apk/app-release.apk Sriinnov-Restaurant-Management-POS.apk
+          ls -lh Sriinnov-Restaurant-Management-POS.apk
 
       - name: 📤 Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: restaurant-mobile-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: Sriinnov-Restaurant-Management-POS.apk
+          path: Sriinnov-Restaurant-Management-POS.apk
           retention-days: 30
 
   build_ios_ipa:
@@ -120,12 +123,75 @@ jobs:
           fi
           echo "Compiled Runner.app located at: $APP_PATH"
           cp -r "$APP_PATH" Payload/
-          zip -r restaurant-mobile-ios.ipa Payload
-          ls -lh restaurant-mobile-ios.ipa
+          zip -r Sriinnov-Restaurant-Management-iOS.ipa Payload
+          ls -lh Sriinnov-Restaurant-Management-iOS.ipa
 
       - name: 📤 Upload Release iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: restaurant-mobile-release-ipa
-          path: restaurant-mobile-ios.ipa
+          name: Sriinnov-Restaurant-Management-iOS.ipa
+          path: Sriinnov-Restaurant-Management-iOS.ipa
           retention-days: 30
+
+  publish_direct_release:
+    name: 🚀 Publish Direct APK & IPA Download Release
+    needs: [ build_android_apk, build_ios_ipa ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout Git Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📥 Download Compiled Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Sriinnov-Restaurant-Management-POS.apk
+          path: ./release-binaries
+
+      - name: 📥 Download Compiled Apple iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: Sriinnov-Restaurant-Management-iOS.ipa
+          path: ./release-binaries
+
+      - name: 📦 Verify Downloaded Binaries
+        run: |
+          ls -lh ./release-binaries/
+
+      - name: 🚀 Publish Direct Downloadable Release to GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          TAG_NAME="v1.0-latest"
+          
+          # Remove old release and tag if present so we cleanly replace binary assets
+          gh release delete "$TAG_NAME" --cleanup-tag -y 2>/dev/null || true
+          git tag -d "$TAG_NAME" 2>/dev/null || true
+          git push -d origin "$TAG_NAME" 2>/dev/null || true
+          
+          # Create updated tag pointing to current master commit
+          git tag -f -a "$TAG_NAME" -m "Automated Direct Release Binaries"
+          git push -f origin "$TAG_NAME"
+          
+          # Publish direct downloadable APK & IPA files to GitHub Releases
+          gh release create "$TAG_NAME" \
+            --title "📱 Sriinnov Restaurant POS - Direct APK & IPA Release" \
+            --notes "### 🎉 Instant Direct Installation Binaries
+          Click the **.apk** or **.ipa** links under **Assets** below to instantly download and install directly onto your POS terminal tablets, smartphones, and KDS screens without needing to unzip workflow archives!
+          
+          #### ✨ Highlights in this Build:
+          * **Rebranded Identity**: Full Sriinnov Restaurant Management titles, menus, and custom logo launcher icon.
+          * **Password-Protected Server Config**: Tap the Host badge on the login terminal screen (default pass: \`admin\`) to dynamically switch Laravel server host IPs and kitchen thermal printer IPs without reinstalling.
+          * **Responsive Mobile Architecture**: Adaptive layout engines for handheld smartphones, compact phones, and widescreen POS tablets.
+          
+          ---
+          *🕒 Automatically compiled from branch \`${GITHUB_REF_NAME}\` via GitHub Actions.*" \
+            ./release-binaries/Sriinnov-Restaurant-Management-POS.apk \
+            ./release-binaries/Sriinnov-Restaurant-Management-iOS.ipa \
+            --latest
