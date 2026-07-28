@@ -52,11 +52,23 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: isMobile ? MainAxisAlignment.start : MainAxisAlignment.center,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('SRIINNOV RESTAURANT MANAGEMENT', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: isMobile ? 22 : 26, fontWeight: FontWeight.w800)),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset('assets/icon/logo.png', width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_menu, color: AppTheme.primaryEmerald, size: 36)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('SRIINNOV RESTAURANT MANAGEMENT', style: GoogleFonts.outfit(color: AppTheme.primaryEmerald, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text('Select Terminal Workspace Mode', style: GoogleFonts.inter(color: AppTheme.slateGray, fontSize: isMobile ? 14 : 15)),
           const SizedBox(height: 24),
           ...demoAccounts.entries.map((e) => Padding(

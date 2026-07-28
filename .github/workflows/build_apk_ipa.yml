@@ -45,6 +45,7 @@ jobs:
       - name: 📦 Install Flutter Dependencies & Sanitize Transitive Modules
         run: |
           flutter pub get
+          dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons
           python3 .github/scripts/sanitize_pub_cache.py
 
       - name: 🏗️ Build Master Universal Android APK
@@ -78,8 +79,10 @@ jobs:
       - name: ⚙️ Auto-Generate Native iOS Project Scaffold & CocoaPods Harness
         run: flutter create --project-name restaurant_mobile --org com.enterprise.restaurant -a kotlin -i swift .
 
-      - name: 📦 Install Flutter Dependencies
-        run: flutter pub get
+      - name: 📦 Install Flutter Dependencies & Generate Brand Icons
+        run: |
+          flutter pub get
+          dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons
 
       - name: 🍏 Prepare Manual Signing & CocoaPods Dependencies
         run: |
