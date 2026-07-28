@@ -3,7 +3,7 @@ import os
 import re
 
 def main():
-    print("=== ENFORCING AGP 8.5.2, KOTLIN 2.0.20, AND GRADLE 9.1 ===")
+    print("=== ENFORCING AGP 8.5.2, KOTLIN 2.0.20, AND GRADLE 9.1.0 ===")
     
     # 1. Update versions across all Android gradle, kts, and properties files
     for root, _, files in os.walk("android"):
@@ -29,9 +29,9 @@ def main():
                     if f.endswith(".properties"):
                         content = re.sub(r'android\.defaults\.buildfeatures\.buildconfig=.*\n?', '', content)
 
-                    # Upgrade Gradle wrapper to 9.1-bin to fulfill modern AGP requirements
+                    # Upgrade Gradle wrapper to 9.1.0-bin (3-part semantic release) to fulfill modern AGP requirements and eradicate 404s
                     if f == "gradle-wrapper.properties":
-                        content = re.sub(r'gradle-[0-9\.]+-(all|bin)\.zip', 'gradle-9.1-bin.zip', content)
+                        content = re.sub(r'gradle-[0-9\.]+-(all|bin)\.zip', 'gradle-9.1.0-bin.zip', content)
                     
                     if content != orig:
                         with open(path, "w", encoding="utf-8") as file:
